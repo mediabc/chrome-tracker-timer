@@ -17,8 +17,8 @@ class TaskTimer {
         this.localFinishInProgress = false;
         this.setupUrlChangeObserver();
         this.timerStateKey = 'timerState';  // Новый ключ для хранения состояния
-        this.originalTitle = document.title;
         this.originalFavicon = this.getFavicon();
+        this.originalTitle = this.getCurrentTaskTitle();
 
         // Add hotkey handlers
         document.addEventListener('keydown', (e) => {
@@ -167,7 +167,7 @@ class TaskTimer {
 
         this.startStopButton = document.createElement('button');
         this.startStopButton.className = 'timer-button g-button g-button_view_normal g-button_size_m g-button_pin_round-round';
-        this.startStopButton.textContent = 'Старт (S)';
+        this.startStopButton.textContent = '⚡ Старт (S)';
         this.startStopButton.onclick = () => this.toggleTimer();
 
         this.finishButton = document.createElement('button');
@@ -238,9 +238,9 @@ class TaskTimer {
     async loadSavedTime() {
         console.log('TaskTimer: Загрузка сохраненного времени для задачи:', this.taskId);
         if (this.taskId) {
-            // Загружаем состояние таймера
-            chrome.storage.local.get(this.timerStateKey, (result) => {
-                const state = result[this.timerStateKey];
+            // Загружаем состояние таймера по ключу задачи
+            chrome.storage.local.get(`timer_state_${this.taskId}`, (result) => {
+                const state = result[`timer_state_${this.taskId}`];
                 if (state && state.taskId === this.taskId) {
                     console.log('TaskTimer: Загружено состояние:', state);
                     
@@ -265,10 +265,12 @@ class TaskTimer {
                 taskId: this.taskId,
                 isRunning: this.isRunning,
                 elapsedTime: this.elapsedTime,
-                lastUpdate: Date.now()  // Сохраняем время последнего обновления
+                lastUpdate: Date.now()
             };
+            
+            // Сохраняем состояние по ключу задачи
             chrome.storage.local.set({
-                [this.timerStateKey]: state
+                [`timer_state_${this.taskId}`]: state
             });
         }
     }
@@ -309,10 +311,22 @@ class TaskTimer {
         });
     }
 
+    getCurrentTaskTitle() {
+        // Получаем текущее название задачи из заголовка
+        const title = document.title;
+        // Убираем индикатор активного таймера, если он есть
+        return title.replace(/^⚡\s/, '');
+    }
+
     async startTimer(isRestoring = false) {
         if (!isRestoring) {
-            const activeTask = await this.checkActiveTimer();
-            if (activeTask && activeTask.taskId !== this.taskId) {
+            const stateKey = `timer_state_${this.taskId}`;
+            const result = await new Promise(resolve => {
+                chrome.storage.local.get(stateKey, resolve);
+            });
+            
+            const state = result[stateKey];
+            if (state && state.isRunning && state.taskId !== this.taskId) {
                 const alertDialog = document.createElement('div');
                 alertDialog.className = 'timer-settings-dialog';
                 
@@ -324,7 +338,7 @@ class TaskTimer {
                 
                 const message = document.createElement('p');
                 message.className = 'timer-setting-item';
-                message.innerHTML = `Таймер уже запущен для задачи <a href="${activeTask.url}" target="_blank">${activeTask.taskId}</a>.<br>Остановите его перед запуском нового таймера.`;
+                message.innerHTML = `Таймер уже запущен для этой задачи в другой вкладке.<br>Состояние будет синхронизировано автоматически.`;
                 
                 const closeButton = document.createElement('button');
                 closeButton.className = 'timer-button g-button g-button_view_normal g-button_size_m g-button_pin_round-round';
@@ -341,29 +355,38 @@ class TaskTimer {
             }
         }
 
+        // Ждем немного, чтобы страница успела обновить заголовок
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Сохраняем актуальное название задачи
+        this.originalTitle = this.getCurrentTaskTitle();
+
         this.isRunning = true;
         this.startTime = Date.now() - this.elapsedTime;
-        this.startStopButton.textContent = 'Пауза (S)';
-        
-        if (!isRestoring) {
-            await this.setActiveTimer(this.taskId);
-        }
+        this.startStopButton.textContent = '⚡ Пауза (S)';
 
         this.timer = setInterval(() => {
             this.elapsedTime = Date.now() - this.startTime;
             this.updateDisplay();
-            this.saveTime();
+            this.saveTimerState();
+            
+            // Обновляем оригинальное название и индикатор
+            this.originalTitle = this.getCurrentTaskTitle();
+            this.setTimerIndicator(true);
         }, 1000);
 
         if (this.showCloseWarning) {
             document.body.classList.add('timer-running');
             this.setTimerIndicator(true);
         }
+        
+        // Сохраняем начальное состояние
+        this.saveTimerState();
     }
 
     stopTimer() {
         this.isRunning = false;
-        this.startStopButton.textContent = 'Старт (S)';
+        this.startStopButton.textContent = '⚡ Старт (S)';
         clearInterval(this.timer);
         this.saveTime();
         document.body.classList.remove('timer-running');
@@ -378,6 +401,17 @@ class TaskTimer {
         // Store the current elapsed time before any resets
         const currentElapsedTime = this.elapsedTime;
         const formattedTime = this.formatTimeForInput(currentElapsedTime);
+        
+        // Calculate start time
+        const startTime = new Date(Date.now() - currentElapsedTime);
+        const formattedDate = startTime.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        const formattedHours = startTime.getHours().toString().padStart(2, '0');
+        const formattedMinutes = startTime.getMinutes().toString().padStart(2, '0');
+        const formattedStartTime = `${formattedDate} ${formattedHours}:${formattedMinutes}`;
         
         chrome.storage.local.set({
             [this.finishedTaskKey]: {
@@ -405,15 +439,23 @@ class TaskTimer {
         
         document.dispatchEvent(keyEvent);
 
-        // Wait for the dialog to open and then fill the duration input
-        const fillDurationInput = setInterval(() => {
+        // Wait for the dialog to open and then fill the inputs
+        const fillInputs = setInterval(() => {
             const durationInput = document.getElementById('duration1');
-            if (durationInput) {
+            const dateInput = document.querySelector('div.add-worklog-dialog__date-control input');
+            
+            if (durationInput && dateInput) {
+                // Fill duration
                 durationInput.value = formattedTime;
                 durationInput.dispatchEvent(new Event('input', { bubbles: true }));
-                clearInterval(fillDurationInput);
+                
+                // Fill start date
+                dateInput.value = formattedStartTime;
+                dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                clearInterval(fillInputs);
             }
-        }, 100);
+        }, 300);
 
         // Сбрасываем флаг через небольшую задержку
         setTimeout(() => {
@@ -544,9 +586,31 @@ class TaskTimer {
 
     setupStorageListener() {
         chrome.storage.local.onChanged.addListener((changes, namespace) => {
+            // Проверяем изменения состояния для текущей задачи
+            const stateKey = `timer_state_${this.taskId}`;
+            if (changes[stateKey]) {
+                const state = changes[stateKey].newValue;
+                if (state && !this.localFinishInProgress) {
+                    console.log('TaskTimer: Обновление состояния из другой вкладки:', state);
+                    
+                    // Обновляем время
+                    this.elapsedTime = state.elapsedTime;
+                    
+                    // Синхронизируем состояние запуска/остановки
+                    if (state.isRunning && !this.isRunning) {
+                        // Запускаем таймер, если он не был запущен
+                        this.startTimer(true);
+                    } else if (!state.isRunning && this.isRunning) {
+                        // Останавливаем таймер, если он был запущен
+                        this.stopTimer();
+                    }
+                    
+                    this.updateDisplay();
+                }
+            }
+
             // Handle finished task changes
             if (changes[this.finishedTaskKey]) {
-                // Игнорируем событие, если это локальное завершение
                 if (this.localFinishInProgress) {
                     return;
                 }
@@ -554,80 +618,17 @@ class TaskTimer {
                 const finishedTask = changes[this.finishedTaskKey].newValue;
                 if (finishedTask && finishedTask.taskId === this.taskId) {
                     console.log('TaskTimer: Таймер учтен в другой вкладке');
-                    // Stop timer if running
                     if (this.isRunning) {
                         this.stopTimer();
                     }
-                    // Reset time if setting enabled
                     if (this.resetOnFinish) {
                         this.elapsedTime = 0;
                         this.updateDisplay();
-                        this.saveTime();
+                        this.saveTimerState();
                     }
-                }
-            }
-
-            // Handle active timer changes
-            if (changes[this.activeTaskKey]) {
-                const activeTask = changes[this.activeTaskKey].newValue;
-                this.handleActiveTimerChange(activeTask);
-            }
-
-            // Handle elapsed time changes for current task
-            if (this.taskId && changes[this.taskId]) {
-                const newTime = changes[this.taskId].newValue;
-                // Only update if the difference is significant (more than 1 second)
-                if (newTime !== this.elapsedTime && Math.abs(newTime - this.elapsedTime) > 1000) {
-                    console.log('TaskTimer: Синхронизация времени с другой вкладки:', newTime);
-                    this.elapsedTime = newTime;
-                    if (this.isRunning) {
-                        this.startTime = Date.now() - this.elapsedTime;
-                    }
-                    this.updateDisplay();
                 }
             }
         });
-    }
-
-    handleActiveTimerChange(activeTask) {
-        if (!activeTask) {
-            if (this.isRunning) {
-                console.log('TaskTimer: Таймер остановлен в другой вкладке');
-                this.isRunning = false;
-                this.startStopButton.textContent = 'Старт (S)';
-                clearInterval(this.timer);
-                document.body.classList.remove('timer-running');
-                this.setTimerIndicator(false);
-            }
-            return;
-        }
-
-        if (activeTask.taskId === this.taskId) {
-            if (!this.isRunning) {
-                console.log('TaskTimer: Таймер запущен в другой вкладке');
-                this.isRunning = true;
-                this.startStopButton.textContent = 'Пауза (S)';
-                this.startTime = Date.now() - this.elapsedTime;
-                this.timer = setInterval(() => {
-                    this.elapsedTime = Date.now() - this.startTime;
-                    this.updateDisplay();
-                    this.saveTime();
-                }, 1000);
-                if (this.showCloseWarning) {
-                    document.body.classList.add('timer-running');
-                    this.setTimerIndicator(true);
-                }
-            }
-        } else {
-            if (this.isRunning) {
-                console.log('TaskTimer: Запущен таймер другой задачи');
-                this.isRunning = false;
-                this.startStopButton.textContent = 'Старт (S)';
-                clearInterval(this.timer);
-                document.body.classList.remove('timer-running');
-                this.setTimerIndicator(false);
-            }
-        }
     }
 
     resetTimer() {
@@ -647,49 +648,10 @@ class TaskTimer {
     setTimerIndicator(isActive) {
         if (isActive) {
             // Добавляем индикатор к заголовку
-            document.title = `⏱ ${this.originalTitle}`;
-            
-            // Создаем красный favicon
-            const canvas = document.createElement('canvas');
-            canvas.width = 32;
-            canvas.height = 32;
-            const ctx = canvas.getContext('2d');
-            
-            // Рисуем красный круг
-            ctx.beginPath();
-            ctx.arc(16, 16, 14, 0, 2 * Math.PI);
-            ctx.fillStyle = '#f44336';
-            ctx.fill();
-            
-            // Создаем и устанавливаем новый favicon
-            const link = document.createElement('link');
-            link.type = 'image/x-icon';
-            link.rel = 'icon';
-            link.href = canvas.toDataURL();
-            
-            // Удаляем старый favicon и добавляем новый
-            const oldIcon = document.querySelector('link[rel="icon"]');
-            if (oldIcon) {
-                oldIcon.remove();
-            }
-            document.head.appendChild(link);
+            document.title = `⚡ ${this.originalTitle}`;
         } else {
             // Возвращаем оригинальный заголовок
             document.title = this.originalTitle;
-            
-            // Возвращаем оригинальный favicon
-            if (this.originalFavicon) {
-                const link = document.createElement('link');
-                link.type = 'image/x-icon';
-                link.rel = 'icon';
-                link.href = this.originalFavicon;
-                
-                const oldIcon = document.querySelector('link[rel="icon"]');
-                if (oldIcon) {
-                    oldIcon.remove();
-                }
-                document.head.appendChild(link);
-            }
         }
     }
 }

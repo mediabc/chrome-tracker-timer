@@ -123,15 +123,15 @@ body.timer-running .tracker-timer-container {
 body.timer-running .tracker-timer-container::after {
     content: '';
     position: absolute;
-    left: -8px;
+    left: -12px;
     top: 50%;
     transform: translateY(-50%);
-    width: 6px;
-    height: 6px;
+    width: 12px;
+    height: 12px;
     background: #f44336;
     border-radius: 50%;
     animation: pulse 2s infinite;
-    margin-top: -3px;
+    margin-top: -6px;
 }
 
 @keyframes pulse {
