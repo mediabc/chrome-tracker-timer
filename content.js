@@ -15,6 +15,7 @@ class TaskTimer {
         this.finishedTaskKey = 'finishedTaskTimer'; // Add new key for tracking finished state
         this.setupStorageListener();
         this.localFinishInProgress = false;
+        this.setupUrlChangeObserver();
 
         // Add hotkey handlers
         document.addEventListener('keydown', (e) => {
@@ -38,51 +39,97 @@ class TaskTimer {
     }
 
     initializeWhenReady() {
-        console.log('TaskTimer: Начало проверки инициализации');
+        console.log('TaskTimer: Starting initialization check');
         const checkInterval = setInterval(() => {
-            console.log('TaskTimer: Проверка состояния документа:', document.readyState);
+            console.log('TaskTimer: Checking document state:', document.readyState);
             if (document.readyState === 'complete') {
-                console.log('TaskTimer: Документ загружен, ожидание React приложения...');
-                setTimeout(() => {
-                    this.taskId = this.getTaskIdFromUrl();
-                    console.log('TaskTimer: ID задачи обнаружен:', this.taskId);
-                    if (this.taskId && !this.initialized) {
-                        console.log('TaskTimer: Инициализация UI для задачи:', this.taskId);
-                        this.initializeUI();
-                        this.loadSavedTime();
-                        this.initialized = true;
-                    } else {
-                        console.log('TaskTimer: Пропуск инициализации. ID задачи существует:', !!this.taskId, 'Уже инициализирован:', this.initialized);
-                    }
-                }, 2000);
+                console.log('TaskTimer: Document complete, checking for task page...');
+                const taskId = this.getTaskIdFromUrl();
+                const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
+                
+                if (taskId && actionBar && !this.initialized) {
+                    console.log('TaskTimer: Task page found, initializing...');
+                    this.taskId = taskId;
+                    this.initializeUI();
+                    this.loadSavedTime();
+                    this.initialized = true;
+                }
                 clearInterval(checkInterval);
             }
         }, 100);
+    }
+
+    setupUrlChangeObserver() {
+        // Наблюдаем за изменениями в URL через History API
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            window.dispatchEvent(new Event('locationchange'));
+        };
+
+        history.replaceState = function() {
+            originalReplaceState.apply(this, arguments);
+            window.dispatchEvent(new Event('locationchange'));
+        };
 
         window.addEventListener('popstate', () => {
-            console.log('TaskTimer: URL изменен');
+            window.dispatchEvent(new Event('locationchange'));
+        });
+
+        // Обработчик изменения URL
+        window.addEventListener('locationchange', () => {
+            console.log('TaskTimer: Обнаружено изменение URL');
             this.handleUrlChange();
         });
-        window.addEventListener('pushstate', () => {
-            console.log('TaskTimer: URL изменен');
-            this.handleUrlChange();
+
+        // Наблюдатель за изменениями DOM
+        const observer = new MutationObserver((mutations) => {
+            // Проверяем, загрузилась ли страница задачи
+            const taskId = this.getTaskIdFromUrl();
+            const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
+            
+            if (taskId && actionBar && !this.initialized) {
+                console.log('TaskTimer: Обнаружена страница задачи после изменения DOM');
+                this.taskId = taskId;
+                this.initializeUI();
+                this.loadSavedTime();
+                this.initialized = true;
+            }
         });
-        window.addEventListener('replacestate', () => {
-            console.log('TaskTimer: URL изменен');
-            this.handleUrlChange();
+
+        // Наблюдаем за изменениями в DOM
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
         });
     }
 
     handleUrlChange() {
         const newTaskId = this.getTaskIdFromUrl();
-        console.log('TaskTimer: Обнаружено изменение URL, новый ID задачи:', newTaskId);
+        console.log('TaskTimer: URL change detected, new task ID:', newTaskId);
+        
         if (newTaskId !== this.taskId) {
-            console.log('TaskTimer: ID задачи изменен с', this.taskId, 'на', newTaskId);
+            console.log('TaskTimer: Task ID changed from', this.taskId, 'to', newTaskId);
             this.taskId = newTaskId;
+            this.initialized = false; // Сбрасываем флаг инициализации
             this.removeExistingTimer();
+            
             if (this.taskId) {
-                this.initializeUI();
-                this.loadSavedTime();
+                // Ждем загрузки UI
+                const checkInterval = setInterval(() => {
+                    const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
+                    if (actionBar) {
+                        clearInterval(checkInterval);
+                        this.initializeUI();
+                        this.loadSavedTime();
+                        this.initialized = true;
+                    }
+                }, 100);
+
+                // Устанавливаем таймаут на случай, если элемент не появится
+                setTimeout(() => clearInterval(checkInterval), 5000);
             }
         }
     }
