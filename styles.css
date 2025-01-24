@@ -29,6 +29,10 @@
     opacity: 0.8;
 }
 
+.timer-button:disabled {
+    cursor: not-allowed;
+}
+
 .action-bar__item {
     display: flex;
     align-items: center;
