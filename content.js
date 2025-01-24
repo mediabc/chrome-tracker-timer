@@ -167,13 +167,23 @@ class TaskTimer {
                     this.loadSavedTime();
                     this.initialized = true;
 
-                    // Сохраняем заголовок страницы с задержкой
+                    // Сохраняем заголовок страницы и название задачи с задержкой
                     setTimeout(() => {
                         console.log('TaskTimer: Сохранение заголовка страницы');
                         this.originalTitle = this.getCurrentTaskTitle();
                         // Если таймер активен, обновляем индикатор
                         if (this.isRunning) {
                             this.setTimerIndicator(true);
+                        }
+                        
+                        // Обновляем название задачи в хранилище
+                        const taskTitle = this.getTaskTitle();
+                        if (taskTitle) {
+                            chrome.runtime.sendMessage({
+                                action: 'updateTimerTitle',
+                                taskId: this.taskId,
+                                title: taskTitle
+                            });
                         }
                     }, 500);
                 }
@@ -257,13 +267,23 @@ class TaskTimer {
                         this.loadSavedTime();
                         this.initialized = true;
 
-                        // Сохраняем заголовок страницы с задержкой
+                        // Сохраняем заголовок страницы и название задачи с задержкой
                         setTimeout(() => {
                             console.log('TaskTimer: Сохранение заголовка страницы после смены URL');
                             this.originalTitle = this.getCurrentTaskTitle();
                             // Если таймер активен, обновляем индикатор
                             if (this.isRunning) {
                                 this.setTimerIndicator(true);
+                            }
+
+                            // Обновляем название задачи в хранилище
+                            const taskTitle = this.getTaskTitle();
+                            if (taskTitle) {
+                                chrome.runtime.sendMessage({
+                                    action: 'updateTimerTitle',
+                                    taskId: this.taskId,
+                                    title: taskTitle
+                                });
                             }
                         }, 500);
                     }
@@ -297,6 +317,11 @@ class TaskTimer {
 
         const timerContainer = document.createElement('div');
         timerContainer.className = 'tracker-timer-container';
+        
+        // Добавляем индикатор
+        const indicator = document.createElement('span');
+        indicator.className = 'timer-indicator';
+        timerContainer.appendChild(indicator);
         
         this.timerDisplay = document.createElement('div');
         this.timerDisplay.className = 'timer-display';
@@ -408,7 +433,7 @@ class TaskTimer {
             title.textContent = 'Уже есть активный таймер';
             
             const message = document.createElement('p');
-            message.innerHTML = `У вас уже запущен таймер для задачи <a href="https://tracker.yandex.ru/${activeTimer.taskId}" target="_blank">${activeTimer.taskId}</a>.<br>Остановите его перед запуском нового таймера.`;
+            message.innerHTML = `У вас уже запущен таймер для задачи <a href="https://tracker.yandex.ru/${activeTimer.taskId}" target="_blank">${activeTimer.taskId}</a>${activeTimer.title ? ': ' + activeTimer.title : ''}.<br>Остановите его перед запуском нового таймера.`;
             
             const closeButton = document.createElement('button');
             closeButton.className = 'timer-button g-button g-button_view_normal g-button_size_m g-button_pin_round-round';
@@ -441,9 +466,13 @@ class TaskTimer {
             return;
         }
 
+        // Получаем название задачи перед запуском таймера
+        const taskTitle = this.getTaskTitle();
+        
         await chrome.runtime.sendMessage({
             action: 'startTimer',
-            taskId: this.taskId
+            taskId: this.taskId,
+            title: taskTitle
         });
     }
 
@@ -474,17 +503,25 @@ class TaskTimer {
         
         // Форматируем время
         const formattedTime = this.formatTimeForInput(currentState.elapsedTime);
+        console.log('TaskTimer: Форматированное время:', formattedTime);
         
         // Рассчитываем время начала
         const startTime = new Date(Date.now() - currentState.elapsedTime);
+        console.log('TaskTimer: Время начала (Date):', startTime);
+        
         const formattedDate = startTime.toLocaleDateString('ru-RU', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
         });
+        console.log('TaskTimer: Форматированная дата:', formattedDate);
+        
         const formattedHours = startTime.getHours().toString().padStart(2, '0');
         const formattedMinutes = startTime.getMinutes().toString().padStart(2, '0');
+        console.log('TaskTimer: Форматированное время (HH:MM):', formattedHours + ':' + formattedMinutes);
+        
         const formattedStartTime = `${formattedDate} ${formattedHours}:${formattedMinutes}`;
+        console.log('TaskTimer: Итоговое форматированное время начала:', formattedStartTime);
 
         // Уведомляем background script о завершении задачи
         await chrome.runtime.sendMessage({
@@ -510,19 +547,38 @@ class TaskTimer {
             const dialog = document.querySelector('div.add-worklog-dialog');
             
             if (dialog) {
+                console.log('TaskTimer: Найден диалог учета времени');
                 // Если диалог найден, заполняем поля
-                const durationInput = document.getElementById('duration1');
-                const dateInput = document.querySelector('div.add-worklog-dialog__date-control input');
+                const durationInput = document.querySelector('.add-worklog-dialog__duration-control input');
+                const dateInput = document.querySelector('.add-worklog-dialog__date-control input');
+                
+                console.log('TaskTimer: Найдены поля ввода:', {
+                    durationInput: !!durationInput,
+                    dateInput: !!dateInput
+                });
                 
                 if (durationInput && dateInput) {
+                    console.log('TaskTimer: Заполняем поле длительности:', formattedTime);
                     durationInput.value = formattedTime;
                     durationInput.dispatchEvent(new Event('input', { bubbles: true }));
                     
-                    dateInput.value = formattedStartTime;
-                    dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Добавляем паузу перед заполнением поля даты/времени
+                    setTimeout(() => {
+                        console.log('TaskTimer: Заполняем поле даты/времени:', formattedStartTime);
+                        dateInput.value = formattedStartTime;
+                        dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        
+                        // Проверяем, что значения были установлены
+                        setTimeout(() => {
+                            console.log('TaskTimer: Проверка установленных значений:', {
+                                duration: durationInput.value,
+                                date: dateInput.value
+                            });
+                        }, 100);
+                    }, 100);
                 }
             } else {
-                obs.disconnect(); // Прекращаем наблюдение
+                console.log('TaskTimer: Диалог учета времени не найден');
             }
         });
 
@@ -531,10 +587,19 @@ class TaskTimer {
             childList: true,
             subtree: true
         });
+        console.log('TaskTimer: Начато наблюдение за DOM для поиска диалога');
 
+        // Устанавливаем таймаут для отключения наблюдателя
+        setTimeout(() => {
+            observer.disconnect();
+            console.log('TaskTimer: Наблюдение за DOM остановлено по таймауту (5 секунд)');
+            this.localFinishInProgress = false;
+        }, 5000);
+
+        // Сбрасываем флаг localFinishInProgress через 5 секунд
         setTimeout(() => {
             this.localFinishInProgress = false;
-        }, 200);
+        }, 5000);
     }
 
     formatTimeForInput(milliseconds) {
@@ -738,6 +803,11 @@ class TaskTimer {
         const title = document.title;
         // Убираем индикатор активного таймера, если он есть
         return title.replace(/^⚡\s/, '');
+    }
+
+    getTaskTitle() {
+        const titleElement = document.querySelector('.issue-summary h1');
+        return titleElement ? titleElement.textContent.trim() : '';
     }
 }
 

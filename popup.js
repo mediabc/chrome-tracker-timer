@@ -9,15 +9,14 @@ function createTimerElement(timer, isAnotherTimerRunning) {
     const taskId = timer.taskId;
     const taskUrl = `https://tracker.yandex.ru/${taskId}`;
     const isRunning = timer.isRunning;
-    const taskTitle = timer.title ? timer.title.replace(`${taskId} `, '') : '';
+    const taskTitle = timer.title ? `${taskId}: ${timer.title}` : taskId;
     
     const timerElement = document.createElement('div');
     timerElement.className = `timer-info ${isRunning ? 'active' : 'paused'}`;
     
     timerElement.innerHTML = `
         <div class="timer-header">
-            <a href="${taskUrl}" target="_blank" class="timer-task">${taskId}</a>
-            ${taskTitle ? `<div class="timer-title">${taskTitle}</div>` : ''}
+            <a href="${taskUrl}" target="_blank" class="timer-task">${taskTitle}</a>
         </div>
         <div class="timer-time">${formatTime(timer.elapsedTime)}</div>
         <div class="timer-status ${isRunning ? 'active' : 'paused'}">

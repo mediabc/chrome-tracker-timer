@@ -118,31 +118,34 @@ body.timer-running .tracker-timer-container {
     position: relative;
 }
 
-body.timer-running .tracker-timer-container::after {
-    content: '';
+.timer-indicator {
+    display: none;
     position: absolute;
-    left: -12px;
+    left: -10px;
     top: 50%;
-    transform: translateY(-50%);
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
     background: #f44336;
     border-radius: 50%;
-    animation: pulse 2s infinite;
-    margin-top: -6px;
+    transform: translate(-50%, -50%);
 }
 
-@keyframes pulse {
+body.timer-running .timer-indicator {
+    display: block;
+    animation: mypulse 2s ease-in-out infinite;
+}
+
+@keyframes mypulse {
     0% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
     }
     50% {
-        opacity: 0.5;
-        transform: translateY(-50%) scale(1.2);
+        transform: translate(-50%, -50%) scale(1.05);
+        opacity: 1;
     }
     100% {
-        opacity: 1;
-        transform: translateY(-50%) scale(1);
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
     }
 } 

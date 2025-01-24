@@ -1,180 +1,156 @@
-class BackgroundTimer {
+class TimerManager {
     constructor() {
-        this.timers = new Map(); // Хранит состояния таймеров для разных задач
-        this.setupAlarms();
-        this.setupMessageListeners();
-        this.updateExtensionIcon();
+        this.timers = new Map();
+        this.setupMessageListener();
+        this.setupAlarm();
+        this.loadSavedTimers();
     }
 
-    setupAlarms() {
-        // Обновляем состояние таймеров каждую секунду
-        chrome.alarms.create('timerTick', { periodInMinutes: 1/60 });
-        
+    setupMessageListener() {
+        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            switch (message.action) {
+                case 'startTimer':
+                    this.startTimer(message.taskId, message.title);
+                    this.updateExtensionIcon();
+                    sendResponse(true);
+                    break;
+                case 'stopTimer':
+                    this.stopTimer(message.taskId);
+                    this.updateExtensionIcon();
+                    sendResponse(true);
+                    break;
+                case 'resetTimer':
+                    this.resetTimer(message.taskId);
+                    this.updateExtensionIcon();
+                    sendResponse(true);
+                    break;
+                case 'getTimerState':
+                    sendResponse(this.getTimerState(message.taskId));
+                    break;
+                case 'finishTask':
+                    this.finishTask(message.taskId);
+                    sendResponse(true);
+                    break;
+                case 'updateTimerTitle':
+                    this.updateTimerTitle(message.taskId, message.title);
+                    sendResponse(true);
+                    break;
+            }
+            return true;
+        });
+    }
+
+    startTimer(taskId, title) {
+        const timer = this.getTimerState(taskId);
+        timer.isRunning = true;
+        timer.lastUpdate = Date.now();
+        if (title) {
+            timer.title = title;
+        }
+        this.saveTimerState(taskId, timer);
+        this.broadcastTimerState(taskId);
+    }
+
+    stopTimer(taskId) {
+        const timer = this.getTimerState(taskId);
+        timer.isRunning = false;
+        this.saveTimerState(taskId, timer);
+        this.broadcastTimerState(taskId);
+    }
+
+    resetTimer(taskId) {
+        const timer = this.getTimerState(taskId);
+        timer.isRunning = false;
+        timer.elapsedTime = 0;
+        timer.lastUpdate = Date.now();
+        this.saveTimerState(taskId, timer);
+        this.broadcastTimerState(taskId);
+    }
+
+    getTimerState(taskId) {
+        if (!this.timers.has(taskId)) {
+            this.timers.set(taskId, {
+                taskId: taskId,
+                isRunning: false,
+                elapsedTime: 0,
+                lastUpdate: Date.now(),
+                title: ''
+            });
+        }
+        return this.timers.get(taskId);
+    }
+
+    updateTimerTitle(taskId, title) {
+        const timer = this.getTimerState(taskId);
+        timer.title = title;
+        this.saveTimerState(taskId, timer);
+        this.broadcastTimerState(taskId);
+    }
+
+    finishTask(taskId) {
+        chrome.storage.local.set({
+            finishedTaskTimer: { taskId, timestamp: Date.now() }
+        });
+    }
+
+    setupAlarm() {
+        chrome.alarms.create('updateTimers', { periodInMinutes: 1/60 });
         chrome.alarms.onAlarm.addListener((alarm) => {
-            if (alarm.name === 'timerTick') {
+            if (alarm.name === 'updateTimers') {
                 this.updateAllTimers();
             }
         });
     }
 
-    setupMessageListeners() {
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            switch (request.action) {
-                case 'startTimer':
-                    this.startTimer(request.taskId);
-                    break;
-                case 'stopTimer':
-                    this.stopTimer(request.taskId);
-                    break;
-                case 'resetTimer':
-                    this.resetTimer(request.taskId);
-                    break;
-                case 'getTimerState':
-                    sendResponse(this.getTimerState(request.taskId));
-                    break;
-                case 'finishTask':
-                    this.finishTask(request.taskId);
-                    break;
-            }
-        });
-    }
-
-    startTimer(taskId) {
-        const now = Date.now();
-        let timer = this.timers.get(taskId) || {
-            taskId,
-            isRunning: false,
-            elapsedTime: 0,
-            lastUpdate: now
-        };
-
-        timer.isRunning = true;
-        timer.lastUpdate = now;
-        this.timers.set(taskId, timer);
-        this.saveTimerState(taskId);
-        this.broadcastTimerState(taskId);
-        this.updateExtensionIcon();
-    }
-
-    stopTimer(taskId) {
-        const timer = this.timers.get(taskId);
-        if (timer) {
-            timer.isRunning = false;
-            this.updateTimer(timer);
-            this.saveTimerState(taskId);
-            this.broadcastTimerState(taskId);
-            this.updateExtensionIcon();
-        }
-    }
-
-    resetTimer(taskId) {
-        const timer = this.timers.get(taskId);
-        if (timer) {
-            timer.isRunning = false;
-            timer.elapsedTime = 0;
-            timer.lastUpdate = Date.now();
-            this.saveTimerState(taskId);
-            this.broadcastTimerState(taskId);
-            this.updateExtensionIcon();
-        }
-    }
-
-    finishTask(taskId) {
-        const timer = this.timers.get(taskId);
-        if (timer) {
-            chrome.storage.local.set({
-                [`finished_task_${taskId}`]: {
-                    taskId,
-                    timestamp: Date.now(),
-                    elapsedTime: timer.elapsedTime
-                }
-            });
-        }
-    }
-
     updateAllTimers() {
         const now = Date.now();
-        for (let [taskId, timer] of this.timers) {
+        for (const [taskId, timer] of this.timers.entries()) {
             if (timer.isRunning) {
-                // Обновляем время
                 timer.elapsedTime += now - timer.lastUpdate;
                 timer.lastUpdate = now;
-                
-                // Сохраняем состояние
-                this.saveTimerState(taskId);
-                
-                // Отправляем обновление всем вкладкам
+                this.saveTimerState(taskId, timer);
                 this.broadcastTimerState(taskId);
             }
         }
     }
 
-    updateTimer(timer) {
-        const now = Date.now();
-        if (timer.isRunning) {
-            timer.elapsedTime += now - timer.lastUpdate;
-        }
-        timer.lastUpdate = now;
-    }
-
-    getTimerState(taskId) {
-        return this.timers.get(taskId) || {
-            taskId,
-            isRunning: false,
-            elapsedTime: 0,
-            lastUpdate: Date.now()
-        };
-    }
-
-    saveTimerState(taskId) {
-        const timer = this.timers.get(taskId);
-        if (timer) {
-            chrome.storage.local.set({
-                [`timer_state_${taskId}`]: timer
-            });
-        }
+    saveTimerState(taskId, timer) {
+        this.timers.set(taskId, timer);
+        chrome.storage.local.set({
+            [`timer_state_${taskId}`]: timer
+        });
     }
 
     broadcastTimerState(taskId) {
         const timer = this.timers.get(taskId);
-        if (timer) {
-            chrome.tabs.query({}, (tabs) => {
-                tabs.forEach(tab => {
-                    if (tab.url && tab.url.includes('tracker.yandex.ru')) {
-                        chrome.tabs.sendMessage(tab.id, {
-                            action: 'timerStateUpdated',
-                            timer: timer
-                        }).catch(() => {
-                            // Игнорируем ошибки отправки сообщений
-                        });
-                    }
-                });
+        chrome.tabs.query({}, (tabs) => {
+            tabs.forEach(tab => {
+                if (tab.url && tab.url.includes('tracker.yandex.ru')) {
+                    chrome.tabs.sendMessage(tab.id, {
+                        action: 'timerStateUpdated',
+                        timer: timer
+                    }).catch(() => {
+                        // Игнорируем ошибки отправки сообщений
+                    });
+                }
             });
-        }
+        });
     }
 
-    // Загрузка сохраненных состояний при запуске
-    async loadSavedStates() {
-        const storage = await chrome.storage.local.get(null);
-        for (let key in storage) {
-            if (key.startsWith('timer_state_')) {
-                const timer = storage[key];
-                if (timer.isRunning) {
-                    // Обновляем время с учетом периода неактивности
-                    const timePassed = Date.now() - timer.lastUpdate;
-                    timer.elapsedTime += timePassed;
-                    timer.lastUpdate = Date.now();
+    loadSavedTimers() {
+        chrome.storage.local.get(null, (items) => {
+            for (let key in items) {
+                if (key.startsWith('timer_state_')) {
+                    const taskId = key.replace('timer_state_', '');
+                    this.timers.set(taskId, items[key]);
                 }
-                this.timers.set(timer.taskId, timer);
             }
-        }
+            this.updateExtensionIcon();
+        });
     }
 
     updateExtensionIcon() {
-        // Проверяем, есть ли активные таймеры
         const hasActiveTimer = Array.from(this.timers.values()).some(timer => timer.isRunning);
-        
-        // Устанавливаем соответствующую иконку
         chrome.action.setIcon({
             path: {
                 48: hasActiveTimer ? 'icon48.png' : 'icon_low_48.png',
@@ -184,6 +160,5 @@ class BackgroundTimer {
     }
 }
 
-// Создаем экземпляр фонового таймера
-const backgroundTimer = new BackgroundTimer();
-backgroundTimer.loadSavedStates(); 
+// Create timer manager instance
+const timerManager = new TimerManager(); 
