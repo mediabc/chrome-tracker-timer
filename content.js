@@ -22,9 +22,10 @@ class TaskTimer {
 
         // Add hotkey handlers
         document.addEventListener('keydown', (e) => {
-            // Check if we're in an input field
+            // Check if we're in an input field, textarea, or active editor
             if (document.activeElement.tagName === 'INPUT' || 
-                document.activeElement.tagName === 'TEXTAREA') {
+                document.activeElement.tagName === 'TEXTAREA' ||
+                document.activeElement.closest('.cm-editor.cm-focused')) {  // Check for active CodeMirror editor
                 return;
             }
 
