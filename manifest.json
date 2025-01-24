@@ -1,17 +1,32 @@
 {
   "manifest_version": 3,
-  "name": "Yandex Tracker Timer",
+  "name": "Chrome Tracker Timer",
   "version": "1.0",
-  "description": "Time tracker for Yandex Tracker tasks",
+  "description": "Таймер для учета времени в Yandex.Tracker",
   "permissions": [
     "storage",
+    "alarms",
     "tabs"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon_low_48.png",
+      "128": "icon_low_128.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["*://tracker.yandex.ru/*"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "css": ["styles.css"],
+      "js": ["content.js"]
     }
-  ]
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
 } 

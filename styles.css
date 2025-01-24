@@ -88,10 +88,9 @@
 }
 
 .timer-settings-content p {
-    color: inherit;
-    font-size: 14px;
+    margin: 16px 0;
     line-height: 1.5;
-    margin: 0 0 24px 0;
+    color: inherit;
 }
 
 .timer-settings-content .timer-button {
@@ -100,12 +99,11 @@
 }
 
 .timer-settings-content a {
-    color: inherit;
-    font-weight: 500;
-    text-decoration: underline;
+    font-weight: 600;
 }
 
 .timer-settings-content a:hover {
+    text-decoration: underline;
     opacity: 0.8;
 }
 

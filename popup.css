@@ -1,0 +1,117 @@
+body {
+    width: 300px;
+    padding: 16px;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.no-timer {
+    color: #666;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.timer-info {
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.timer-info.active {
+    background: #f0f7ff;
+    border-left: 4px solid #4a90e2;
+}
+
+.timer-info.paused {
+    background: #f5f5f5;
+    border-left: 4px solid #999;
+}
+
+.timer-header {
+    margin-bottom: 8px;
+}
+
+.timer-task {
+    color: #333;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 14px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.timer-task:hover {
+    color: #4a90e2;
+}
+
+.timer-title {
+    color: #666;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 4px;
+    word-break: break-word;
+}
+
+.timer-time {
+    font-size: 20px;
+    font-weight: bold;
+    color: #333;
+    margin: 8px 0;
+}
+
+.timer-status {
+    font-size: 12px;
+    margin: 8px 0;
+}
+
+.timer-status.active {
+    color: #4a90e2;
+}
+
+.timer-status.paused {
+    color: #666;
+}
+
+.timer-control {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+    transition: all 0.2s ease;
+}
+
+.timer-control:not(:disabled):hover {
+    background: #f8f8f8;
+    border-color: #999;
+}
+
+.timer-control:disabled {
+    background: #f5f5f5;
+    border-color: #ddd;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.active .timer-control:not(:disabled) {
+    background: #4a90e2;
+    color: white;
+    border-color: #4a90e2;
+}
+
+.active .timer-control:not(:disabled):hover {
+    background: #357abd;
+    border-color: #357abd;
+}
+
+.popup-title {
+    margin: 0 0 16px 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: inherit;
+} 
