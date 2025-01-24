@@ -13,7 +13,7 @@ body {
 
 .timer-info {
     background: #f5f5f5;
-    border-radius: 8px;
+    border-radius: 0 16px 16px 0;
     padding: 12px;
     margin-bottom: 12px;
 }

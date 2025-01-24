@@ -2,6 +2,12 @@
 
 Расширение для Chrome, добавляющее таймер для учета времени в Yandex.Tracker.
 
+![Интерфейс таймера](docs/timer-interface.png)
+
+![Запущенный таймер](docs/timer-started.png)
+
+![Popup-интерфейс](docs/popup-interface.png)
+
 ## Основные возможности
 
 - ⏱ Отслеживание времени работы над задачами
