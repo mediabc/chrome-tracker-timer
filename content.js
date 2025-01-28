@@ -27,12 +27,30 @@ class TaskTimer {
         this.originalFavicon = this.getFavicon();
         this.originalTitle = this.getCurrentTaskTitle();
 
+        // Проверяем, находимся ли мы на странице задачи
+        const taskId = this.getTaskIdFromUrl();
+        if (!taskId) {
+            console.log('TaskTimer: Не найден ID задачи в URL, инициализация отложена');
+            return;
+        }
+
         // Add hotkey handlers
         document.addEventListener('keydown', (e) => {
-            // Check if we're in an input field, textarea, or active editor
-            if (document.activeElement.tagName === 'INPUT' || 
-                document.activeElement.tagName === 'TEXTAREA' ||
-                document.activeElement.closest('.cm-editor.cm-focused')) {  // Check for active CodeMirror editor
+            // Проверяем, находимся ли мы в каком-либо поле ввода или редактируемом элементе
+            const activeElement = document.activeElement;
+            const isEditableElement = 
+                activeElement.tagName === 'INPUT' || 
+                activeElement.tagName === 'TEXTAREA' || 
+                activeElement.tagName === 'SELECT' ||
+                activeElement.isContentEditable ||
+                activeElement.closest('.cm-editor.cm-focused') || // CodeMirror editor
+                activeElement.closest('[contenteditable="true"]') || // Любой редактируемый элемент
+                activeElement.closest('.ProseMirror') || // ProseMirror editor
+                activeElement.closest('.ql-editor') || // Quill editor
+                activeElement.closest('.CodeMirror-focused'); // Другой вариант CodeMirror
+
+            // Если мы в редактируемом элементе, позволяем стандартную обработку клавиш
+            if (isEditableElement) {
                 return;
             }
 
@@ -47,6 +65,8 @@ class TaskTimer {
                 this.toggleTimer();
             }
         });
+
+        this.cleanupInvalidTimers();
     }
 
     setupMessageListener() {
@@ -414,6 +434,12 @@ class TaskTimer {
     }
 
     async startTimer() {
+        // Проверяем наличие taskId
+        if (!this.taskId) {
+            console.error('TaskTimer: Попытка запуска таймера без ID задачи');
+            return;
+        }
+
         // Проверяем, есть ли уже запущенный таймер
         const storage = await new Promise(resolve => chrome.storage.local.get(null, resolve));
         const activeTimer = Object.entries(storage)
@@ -477,6 +503,12 @@ class TaskTimer {
     }
 
     async stopTimer() {
+        // Проверяем наличие taskId
+        if (!this.taskId) {
+            console.error('TaskTimer: Попытка остановки таймера без ID задачи');
+            return;
+        }
+
         await chrome.runtime.sendMessage({
             action: 'stopTimer',
             taskId: this.taskId
@@ -791,6 +823,12 @@ class TaskTimer {
     }
 
     toggleTimer() {
+        // Проверяем наличие taskId
+        if (!this.taskId) {
+            console.error('TaskTimer: Попытка переключения таймера без ID задачи');
+            return;
+        }
+
         if (!this.isRunning) {
             this.startTimer();
         } else {
@@ -808,6 +846,21 @@ class TaskTimer {
     getTaskTitle() {
         const titleElement = document.querySelector('.issue-summary h1');
         return titleElement ? titleElement.textContent.trim() : '';
+    }
+
+    // Добавим метод для очистки некорректных таймеров
+    async cleanupInvalidTimers() {
+        const storage = await new Promise(resolve => chrome.storage.local.get(null, resolve));
+        
+        for (const [key, value] of Object.entries(storage)) {
+            if (key.startsWith('timer_state_')) {
+                // Проверяем наличие taskId в таймере
+                if (!value.taskId) {
+                    console.log('TaskTimer: Удаление некорректного таймера:', key);
+                    chrome.storage.local.remove(key);
+                }
+            }
+        }
     }
 }
 
