@@ -50,7 +50,7 @@ class TaskTimer {
                 this.updateDisplay();
                 
                 // Обновляем состояние кнопки
-                this.startStopButton.textContent = this.isRunning ? '⚡ Пауза (S)' : '⚡ Старт (S)';
+                this.startStopButton.textContent = this.isRunning ? '⚡ Пауза' : '⚡ Старт';
                 
                 // Принудительно обновляем визуальные индикаторы
                 if (this.isRunning) {
@@ -117,7 +117,7 @@ class TaskTimer {
     }
 
     updateButtonState() {
-        this.startStopButton.textContent = this.isRunning ? '⚡ Пауза (S)' : '⚡ Старт (S)';
+        this.startStopButton.textContent = this.isRunning ? '⚡ Пауза' : '⚡ Старт';
     }
 
     updateVisualState() {
