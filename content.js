@@ -27,6 +27,21 @@ class TaskTimer {
         this.originalFavicon = this.getFavicon();
         this.originalTitle = this.getCurrentTaskTitle();
 
+        // Проверяем, находимся ли мы на странице списка задач
+        const currentPath = window.location.pathname;
+        console.log('TaskTimer: Текущий путь:', currentPath);
+        
+        // Проверяем различные пути, где может быть список задач
+        if (currentPath.includes('/issues') || 
+            currentPath.includes('/pages/my') || 
+            currentPath.includes('/pages/all') ||
+            currentPath === '/') {
+            console.log('TaskTimer: Обнаружена страница со списком задач');
+            this.initializeDueDateHighlighting();
+        } else {
+            console.log('TaskTimer: Текущая страница не содержит список задач');
+        }
+
         // Проверяем, находимся ли мы на странице задачи
         const taskId = this.getTaskIdFromUrl();
         if (!taskId) {
@@ -174,6 +189,9 @@ class TaskTimer {
                             });
                         }
                     }, 500);
+
+                    // Добавляем инициализацию подсветки дедлайнов здесь
+                    this.initializeDueDateHighlighting();
                 }
                 clearInterval(checkInterval);
             }
@@ -828,6 +846,245 @@ class TaskTimer {
                     chrome.storage.local.remove(key);
                 }
             }
+        }
+    }
+
+    initializeDueDateHighlighting() {
+        console.log('TaskTimer: Начало инициализации подсветки дедлайнов');
+        
+        // Функция для подсветки дедлайнов
+        const highlightDueDates = () => {
+            console.log('TaskTimer: Запуск функции подсветки дедлайнов');
+            
+            // Находим все ячейки с датами
+            const dueDateCells = document.querySelectorAll('td.gt-table__cell_id_dueDate');
+            console.log('TaskTimer: Найдено ячеек с датами:', dueDateCells.length);
+            
+            if (dueDateCells.length === 0) {
+                console.log('TaskTimer: Ячейки с датами не найдены, попробуем через 5 секунд');
+                return false;
+            }
+            
+            dueDateCells.forEach((cell, index) => {
+                const dateSpan = cell.querySelector('span[title]');
+                if (!dateSpan) {
+                    console.log(`TaskTimer: Ячейка ${index + 1} не содержит span с title`);
+                    return;
+                }
+
+                // Получаем дату из атрибута title
+                const dateText = dateSpan.getAttribute('title');
+                console.log(`TaskTimer: Обработка даты для ячейки ${index + 1}:`, dateText);
+                
+                const dueDate = this.parseRussianDate(dateText);
+                if (!dueDate) {
+                    console.log(`TaskTimer: Не удалось распарсить дату для ячейки ${index + 1}`);
+                    return;
+                }
+
+                // Создаем дату начала текущего дня (00:00:00)
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                // Создаем дату начала дня дедлайна (00:00:00)
+                const dueDateStart = new Date(dueDate);
+                dueDateStart.setHours(0, 0, 0, 0);
+
+                const twoWeeksFromNow = new Date(today);
+                twoWeeksFromNow.setDate(today.getDate() + 14);
+                twoWeeksFromNow.setHours(23, 59, 59, 999);
+
+                console.log(`TaskTimer: Сравнение дат для ячейки ${index + 1}:`, {
+                    dateText,
+                    dueDate: dueDate.toISOString(),
+                    dueDateStart: dueDateStart.toISOString(),
+                    today: today.toISOString(),
+                    twoWeeksFromNow: twoWeeksFromNow.toISOString(),
+                    isPassed: dueDateStart < today,
+                    isApproaching: dueDateStart <= twoWeeksFromNow && dueDateStart >= today
+                });
+
+                // Удаляем предыдущие классы подсветки
+                cell.classList.remove('deadline-passed', 'deadline-approaching');
+                dateSpan.classList.remove('deadline-passed', 'deadline-approaching');
+                
+                // Подсвечиваем просроченные дедлайны (сравниваем начало дня)
+                if (dueDateStart < today) {
+                    console.log(`TaskTimer: Ячейка ${index + 1} - просроченный дедлайн:`, dateText);
+                    dateSpan.classList.add('deadline-passed');
+                }
+                // Подсвечиваем приближающиеся дедлайны
+                else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
+                    console.log(`TaskTimer: Ячейка ${index + 1} - приближающийся дедлайн:`, dateText);
+                    dateSpan.classList.add('deadline-approaching');
+                }
+            });
+            
+            return true;
+        };
+
+        // Добавляем стили для подсветки
+        const style = document.createElement('style');
+        style.textContent = `
+            .deadline-passed {
+                color: #ff4444 !important;
+            }
+            .deadline-approaching {
+                color: #ffa500 !important;
+            }
+            td.gt-table__cell_id_dueDate .deadline-passed,
+            td.gt-table__cell_id_dueDate .deadline-approaching {
+                display: inline-block;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Функция для повторных попыток с таймаутом
+        const initializeWithRetry = () => {
+            console.log('TaskTimer: Попытка инициализации подсветки');
+            
+            // Пробуем подсветить дедлайны
+            if (!highlightDueDates()) {
+                setTimeout(initializeWithRetry, 1000); // Уменьшено до 1 секунды
+                return;
+            }
+
+            // Если всё успешно, устанавливаем наблюдатель
+            const observer = new MutationObserver(() => {
+                highlightDueDates();
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        };
+
+        // Запускаем первую попытку через 1 секунду
+        setTimeout(initializeWithRetry, 1000);
+
+        // Следим за изменениями URL
+        window.addEventListener('popstate', () => {
+            const newPath = window.location.pathname;
+            if (newPath.includes('/issues') || 
+                newPath.includes('/pages/my') || 
+                newPath.includes('/pages/all') ||
+                newPath === '/') {
+                setTimeout(initializeWithRetry, 1000);
+            }
+        });
+
+        // Также следим за изменениями через History API
+        const originalPushState = history.pushState;
+        history.pushState = function() {
+            originalPushState.apply(this, arguments);
+            const newPath = window.location.pathname;
+            if (newPath.includes('/issues') || 
+                newPath.includes('/pages/my') || 
+                newPath.includes('/pages/all') ||
+                newPath === '/') {
+                setTimeout(initializeWithRetry, 1000);
+            }
+        };
+    }
+
+    parseRussianDate(dateStr) {
+        console.log('TaskTimer: Парсинг даты:', dateStr);
+        try {
+            // Словарь для преобразования русских названий месяцев
+            const monthsRu = {
+                'янв': 0, 'января': 0,
+                'фев': 1, 'февраля': 1,
+                'мар': 2, 'марта': 2,
+                'апр': 3, 'апреля': 3,
+                'май': 4, 'мая': 4,
+                'июн': 5, 'июня': 5,
+                'июл': 6, 'июля': 6,
+                'авг': 7, 'августа': 7,
+                'сен': 8, 'сентября': 8,
+                'окт': 9, 'октября': 9,
+                'ноя': 10, 'нояб': 10, 'ноября': 10,
+                'дек': 11, 'декабря': 11
+            };
+
+            // Разбиваем строку на компоненты
+            const parts = dateStr.split(' ');
+            console.log('TaskTimer: Разбор даты:', parts);
+            
+            let day, month, year;
+            
+            if (parts.length === 3) {
+                // Формат "24 нояб 2024"
+                [day, month, year] = parts;
+                console.log('TaskTimer: Дата с годом:', { day, month, year });
+            } else if (parts.length === 2) {
+                // Формат "24 нояб"
+                [day, month] = parts;
+                console.log('TaskTimer: Дата без года:', { day, month });
+            } else {
+                console.log('TaskTimer: Некорректный формат даты - неверное количество частей');
+                return null;
+            }
+
+            // Проверяем корректность дня
+            const parsedDay = parseInt(day, 10);
+            if (isNaN(parsedDay) || parsedDay < 1 || parsedDay > 31) {
+                console.log('TaskTimer: Некорректный день:', day);
+                return null;
+            }
+
+            // Проверяем корректность месяца
+            const monthLower = month.toLowerCase();
+            if (!monthsRu.hasOwnProperty(monthLower)) {
+                console.log('TaskTimer: Некорректный месяц:', month, 'Доступные месяцы:', Object.keys(monthsRu));
+                return null;
+            }
+
+            // Проверяем корректность года, если он есть
+            let parsedYear = null;
+            if (year) {
+                parsedYear = parseInt(year, 10);
+                if (isNaN(parsedYear)) {
+                    console.log('TaskTimer: Некорректный год:', year);
+                    return null;
+                }
+            }
+
+            // Создаем объект даты
+            const date = new Date();
+            date.setHours(0, 0, 0, 0);
+            date.setDate(parsedDay);
+            date.setMonth(monthsRu[monthLower]);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (parsedYear) {
+                // Если указан год, используем его
+                date.setFullYear(parsedYear);
+            } else {
+                // Для дат без года используем предыдущую логику
+                const monthsDiff = today.getMonth() - date.getMonth();
+                const isDateInPast = date < today;
+                const isLongPastDue = Math.abs(monthsDiff) > 6;
+
+                if (isDateInPast && isLongPastDue) {
+                    date.setFullYear(today.getFullYear() + 1);
+                } else {
+                    date.setFullYear(today.getFullYear());
+                }
+            }
+
+            console.log('TaskTimer: Успешно создана дата:', {
+                dateStr,
+                parsedDate: date.toISOString(),
+                hasYear: !!parsedYear,
+                isPastDate: date < today
+            });
+            return date;
+        } catch (e) {
+            console.error('TaskTimer: Ошибка при парсинге даты:', e);
+            return null;
         }
     }
 }
