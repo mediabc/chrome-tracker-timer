@@ -34,38 +34,6 @@ class TaskTimer {
             return;
         }
 
-        // Add hotkey handlers
-        document.addEventListener('keydown', (e) => {
-            // Проверяем, находимся ли мы в каком-либо поле ввода или редактируемом элементе
-            const activeElement = document.activeElement;
-            const isEditableElement = 
-                activeElement.tagName === 'INPUT' || 
-                activeElement.tagName === 'TEXTAREA' || 
-                activeElement.tagName === 'SELECT' ||
-                activeElement.isContentEditable ||
-                activeElement.closest('.cm-editor.cm-focused') || // CodeMirror editor
-                activeElement.closest('[contenteditable="true"]') || // Любой редактируемый элемент
-                activeElement.closest('.ProseMirror') || // ProseMirror editor
-                activeElement.closest('.ql-editor') || // Quill editor
-                activeElement.closest('.CodeMirror-focused'); // Другой вариант CodeMirror
-
-            // Если мы в редактируемом элементе, позволяем стандартную обработку клавиш
-            if (isEditableElement) {
-                return;
-            }
-
-            // Prevent if any modifier keys are pressed
-            if (e.ctrlKey || e.altKey || e.metaKey) {
-                return;
-            }
-
-            // Start/Pause hotkey (S/Ы)
-            if (e.key.toLowerCase() === 's' || e.key.toLowerCase() === 'ы') {
-                e.preventDefault();
-                this.toggleTimer();
-            }
-        });
-
         this.cleanupInvalidTimers();
     }
 
@@ -349,7 +317,7 @@ class TaskTimer {
 
         this.startStopButton = document.createElement('button');
         this.startStopButton.className = 'timer-button g-button g-button_view_normal g-button_size_m g-button_pin_round-round';
-        this.startStopButton.textContent = '⚡ Старт (S)';
+        this.startStopButton.textContent = '⚡ Старт';
         this.startStopButton.onclick = () => this.toggleTimer();
 
         this.finishButton = document.createElement('button');
