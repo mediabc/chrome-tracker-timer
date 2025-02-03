@@ -38,6 +38,10 @@ class TaskTimer {
             currentPath === '/') {
             console.log('TaskTimer: Обнаружена страница со списком задач');
             this.initializeDueDateHighlighting();
+        } else if (this.getTaskIdFromUrl()) {
+            // Если это страница задачи, тоже инициализируем подсветку
+            console.log('TaskTimer: Обнаружена страница задачи, инициализируем подсветку дедлайна');
+            this.initializeDueDateHighlighting();
         } else {
             console.log('TaskTimer: Текущая страница не содержит список задач');
         }
@@ -852,80 +856,10 @@ class TaskTimer {
     initializeDueDateHighlighting() {
         console.log('TaskTimer: Начало инициализации подсветки дедлайнов');
         
-        // Функция для подсветки дедлайнов
-        const highlightDueDates = () => {
-            console.log('TaskTimer: Запуск функции подсветки дедлайнов');
-            
-            // Находим все ячейки с датами
-            const dueDateCells = document.querySelectorAll('td.gt-table__cell_id_dueDate');
-            console.log('TaskTimer: Найдено ячеек с датами:', dueDateCells.length);
-            
-            if (dueDateCells.length === 0) {
-                console.log('TaskTimer: Ячейки с датами не найдены, попробуем через 5 секунд');
-                return false;
-            }
-            
-            dueDateCells.forEach((cell, index) => {
-                const dateSpan = cell.querySelector('span[title]');
-                if (!dateSpan) {
-                    console.log(`TaskTimer: Ячейка ${index + 1} не содержит span с title`);
-                    return;
-                }
-
-                // Получаем дату из атрибута title
-                const dateText = dateSpan.getAttribute('title');
-                console.log(`TaskTimer: Обработка даты для ячейки ${index + 1}:`, dateText);
-                
-                const dueDate = this.parseRussianDate(dateText);
-                if (!dueDate) {
-                    console.log(`TaskTimer: Не удалось распарсить дату для ячейки ${index + 1}`);
-                    return;
-                }
-
-                // Создаем дату начала текущего дня (00:00:00)
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                
-                // Создаем дату начала дня дедлайна (00:00:00)
-                const dueDateStart = new Date(dueDate);
-                dueDateStart.setHours(0, 0, 0, 0);
-
-                const twoWeeksFromNow = new Date(today);
-                twoWeeksFromNow.setDate(today.getDate() + 14);
-                twoWeeksFromNow.setHours(23, 59, 59, 999);
-
-                console.log(`TaskTimer: Сравнение дат для ячейки ${index + 1}:`, {
-                    dateText,
-                    dueDate: dueDate.toISOString(),
-                    dueDateStart: dueDateStart.toISOString(),
-                    today: today.toISOString(),
-                    twoWeeksFromNow: twoWeeksFromNow.toISOString(),
-                    isPassed: dueDateStart < today,
-                    isApproaching: dueDateStart <= twoWeeksFromNow && dueDateStart >= today
-                });
-
-                // Удаляем предыдущие классы подсветки
-                cell.classList.remove('deadline-passed', 'deadline-approaching');
-                dateSpan.classList.remove('deadline-passed', 'deadline-approaching');
-                
-                // Подсвечиваем просроченные дедлайны (сравниваем начало дня)
-                if (dueDateStart < today) {
-                    console.log(`TaskTimer: Ячейка ${index + 1} - просроченный дедлайн:`, dateText);
-                    dateSpan.classList.add('deadline-passed');
-                }
-                // Подсвечиваем приближающиеся дедлайны
-                else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
-                    console.log(`TaskTimer: Ячейка ${index + 1} - приближающийся дедлайн:`, dateText);
-                    dateSpan.classList.add('deadline-approaching');
-                }
-            });
-            
-            return true;
-        };
-
-        // Добавляем стили для подсветки
+        // Обновляем стили для подсветки
         const style = document.createElement('style');
         style.textContent = `
+            /* Стили для таблицы задач */
             .deadline-passed {
                 color: #ff4444 !important;
             }
@@ -936,8 +870,129 @@ class TaskTimer {
             td.gt-table__cell_id_dueDate .deadline-approaching {
                 display: inline-block;
             }
+            
+            /* Стили для страницы задачи */
+            li[data-id="dueDate"] span.g-button__text > div.deadline-passed {
+                color: #ff4444 !important;
+            }
+            li[data-id="dueDate"] span.g-button__text > div.deadline-approaching {
+                color: #ffa500 !important;
+            }
         `;
         document.head.appendChild(style);
+
+        // Функция для подсветки дедлайнов
+        const highlightDueDates = () => {
+            console.log('TaskTimer: Запуск функции подсветки дедлайнов');
+            
+            let foundElements = false;
+
+            // Находим все ячейки с датами в таблице
+            const dueDateCells = document.querySelectorAll('td.gt-table__cell_id_dueDate');
+            console.log('TaskTimer: Найдено ячеек с датами в таблице:', dueDateCells.length);
+            
+            if (dueDateCells.length > 0) {
+                foundElements = true;
+                dueDateCells.forEach((cell, index) => {
+                    const dateSpan = cell.querySelector('span[title]');
+                    if (!dateSpan) {
+                        console.log(`TaskTimer: Ячейка ${index + 1} не содержит span с title`);
+                        return;
+                    }
+
+                    // Получаем дату из атрибута title
+                    const dateText = dateSpan.getAttribute('title');
+                    console.log(`TaskTimer: Обработка даты для ячейки ${index + 1}:`, dateText);
+                    
+                    const dueDate = this.parseRussianDate(dateText);
+                    if (!dueDate) {
+                        console.log(`TaskTimer: Не удалось распарсить дату для ячейки ${index + 1}`);
+                        return;
+                    }
+
+                    // Создаем дату начала текущего дня (00:00:00)
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    // Создаем дату начала дня дедлайна (00:00:00)
+                    const dueDateStart = new Date(dueDate);
+                    dueDateStart.setHours(0, 0, 0, 0);
+
+                    const twoWeeksFromNow = new Date(today);
+                    twoWeeksFromNow.setDate(today.getDate() + 14);
+                    twoWeeksFromNow.setHours(23, 59, 59, 999);
+
+                    console.log(`TaskTimer: Сравнение дат для ячейки ${index + 1}:`, {
+                        dateText,
+                        dueDate: dueDate.toISOString(),
+                        dueDateStart: dueDateStart.toISOString(),
+                        today: today.toISOString(),
+                        twoWeeksFromNow: twoWeeksFromNow.toISOString(),
+                        isPassed: dueDateStart < today,
+                        isApproaching: dueDateStart <= twoWeeksFromNow && dueDateStart >= today
+                    });
+
+                    // Удаляем предыдущие классы подсветки
+                    cell.classList.remove('deadline-passed', 'deadline-approaching');
+                    dateSpan.classList.remove('deadline-passed', 'deadline-approaching');
+                    
+                    // Подсвечиваем просроченные дедлайны (сравниваем начало дня)
+                    if (dueDateStart < today) {
+                        console.log(`TaskTimer: Ячейка ${index + 1} - просроченный дедлайн:`, dateText);
+                        dateSpan.classList.add('deadline-passed');
+                    }
+                    // Подсвечиваем приближающиеся дедлайны
+                    else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
+                        console.log(`TaskTimer: Ячейка ${index + 1} - приближающийся дедлайн:`, dateText);
+                        dateSpan.classList.add('deadline-approaching');
+                    }
+                });
+            }
+
+            // Добавляем обработку дедлайна на странице задачи
+            const dueDateFields = document.querySelectorAll('li[data-id="dueDate"] span.g-button__text > div');
+            console.log('TaskTimer: Найдено полей дедлайна на странице задачи:', dueDateFields.length);
+
+            if (dueDateFields.length > 0) {
+                foundElements = true;
+                dueDateFields.forEach((field, index) => {
+                    const dateText = field.textContent;
+                    console.log(`TaskTimer: Обработка даты для поля ${index + 1}:`, dateText);
+
+                    const dueDate = this.parseRussianDate(dateText);
+                    if (!dueDate) {
+                        console.log(`TaskTimer: Не удалось распарсить дату для поля ${index + 1}`);
+                        return;
+                    }
+
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    const dueDateStart = new Date(dueDate);
+                    dueDateStart.setHours(0, 0, 0, 0);
+
+                    const twoWeeksFromNow = new Date(today);
+                    twoWeeksFromNow.setDate(today.getDate() + 14);
+                    twoWeeksFromNow.setHours(23, 59, 59, 999);
+
+                    // Удаляем предыдущие классы подсветки
+                    field.classList.remove('deadline-passed', 'deadline-approaching');
+
+                    // Подсвечиваем просроченные дедлайны
+                    if (dueDateStart < today) {
+                        console.log(`TaskTimer: Поле ${index + 1} - просроченный дедлайн:`, dateText);
+                        field.classList.add('deadline-passed');
+                    }
+                    // Подсвечиваем приближающиеся дедлайны
+                    else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
+                        console.log(`TaskTimer: Поле ${index + 1} - приближающийся дедлайн:`, dateText);
+                        field.classList.add('deadline-approaching');
+                    }
+                });
+            }
+
+            return foundElements;
+        };
 
         // Функция для повторных попыток с таймаутом
         const initializeWithRetry = () => {
