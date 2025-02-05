@@ -1,6 +1,5 @@
 class TaskTimer {
     constructor() {
-        console.log('TaskTimer: Конструктор инициализирован');
         this.isRunning = false;
         this.elapsedTime = 0;
         this.taskId = null;
@@ -29,27 +28,21 @@ class TaskTimer {
 
         // Проверяем, находимся ли мы на странице списка задач
         const currentPath = window.location.pathname;
-        console.log('TaskTimer: Текущий путь:', currentPath);
         
         // Проверяем различные пути, где может быть список задач
         if (currentPath.includes('/issues') || 
             currentPath.includes('/pages/my') || 
             currentPath.includes('/pages/all') ||
             currentPath === '/') {
-            console.log('TaskTimer: Обнаружена страница со списком задач');
             this.initializeDueDateHighlighting();
         } else if (this.getTaskIdFromUrl()) {
             // Если это страница задачи, тоже инициализируем подсветку
-            console.log('TaskTimer: Обнаружена страница задачи, инициализируем подсветку дедлайна');
             this.initializeDueDateHighlighting();
-        } else {
-            console.log('TaskTimer: Текущая страница не содержит список задач');
         }
 
         // Проверяем, находимся ли мы на странице задачи
         const taskId = this.getTaskIdFromUrl();
         if (!taskId) {
-            console.log('TaskTimer: Не найден ID задачи в URL, инициализация отложена');
             return;
         }
 
@@ -59,8 +52,6 @@ class TaskTimer {
     setupMessageListener() {
         chrome.runtime.onMessage.addListener((message) => {
             if (message.action === 'timerStateUpdated' && message.timer.taskId === this.taskId) {
-                console.log('TaskTimer: Получено обновление состояния:', message.timer);
-                
                 // Обновляем локальное состояние
                 this.isRunning = message.timer.isRunning;
                 this.elapsedTime = message.timer.elapsedTime;
@@ -96,17 +87,14 @@ class TaskTimer {
 
         const checkTitle = () => {
             const currentTitle = this.getCurrentTaskTitle();
-            console.log('TaskTimer: Проверка заголовка:', currentTitle);
 
             if (isValidTitle(currentTitle)) {
-                console.log('TaskTimer: Найден корректный заголовок:', currentTitle);
                 this.originalTitle = currentTitle;
                 this.setTimerIndicator(true);
             } else if (attempts < maxAttempts) {
                 attempts++;
                 setTimeout(checkTitle, 100);
             } else {
-                console.log('TaskTimer: Не удалось получить корректный заголовок');
                 // Если не удалось получить корректный заголовок, пробуем еще раз через секунду
                 setTimeout(() => {
                     if (this.isRunning) {
@@ -151,11 +139,8 @@ class TaskTimer {
     }
 
     initializeWhenReady() {
-        console.log('TaskTimer: Starting initialization check');
         const checkInterval = setInterval(() => {
-            console.log('TaskTimer: Checking document state:', document.readyState);
             if (document.readyState === 'complete') {
-                console.log('TaskTimer: Document complete, checking for task page...');
                 const taskId = this.getTaskIdFromUrl();
                 const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
                 
@@ -163,12 +148,10 @@ class TaskTimer {
                     // Проверяем, нет ли уже инициализированного таймера для этой задачи
                     const existingTimer = document.querySelector('.tracker-timer-container');
                     if (existingTimer) {
-                        console.log('TaskTimer: Таймер для задачи уже существует');
                         clearInterval(checkInterval);
                         return;
                     }
 
-                    console.log('TaskTimer: Task page found, initializing...');
                     this.taskId = taskId;
                     this.initializeUI();
                     this.loadSavedTime();
@@ -176,7 +159,6 @@ class TaskTimer {
 
                     // Сохраняем заголовок страницы и название задачи с задержкой
                     setTimeout(() => {
-                        console.log('TaskTimer: Сохранение заголовка страницы');
                         this.originalTitle = this.getCurrentTaskTitle();
                         // Если таймер активен, обновляем индикатор
                         if (this.isRunning) {
@@ -223,7 +205,6 @@ class TaskTimer {
 
         // Обработчик изменения URL
         window.addEventListener('locationchange', () => {
-            console.log('TaskTimer: Обнаружено изменение URL');
             this.handleUrlChange();
         });
 
@@ -234,7 +215,6 @@ class TaskTimer {
             const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
             
             if (taskId && actionBar && !this.initialized) {
-                console.log('TaskTimer: Обнаружена страница задачи после изменения DOM');
                 this.taskId = taskId;
                 this.initializeUI();
                 this.loadSavedTime();
@@ -251,10 +231,8 @@ class TaskTimer {
 
     handleUrlChange() {
         const newTaskId = this.getTaskIdFromUrl();
-        console.log('TaskTimer: URL change detected, new task ID:', newTaskId);
         
         if (newTaskId !== this.taskId) {
-            console.log('TaskTimer: Task ID changed from', this.taskId, 'to', newTaskId);
             this.taskId = newTaskId;
             this.initialized = false; // Сбрасываем флаг инициализации
             this.removeExistingTimer();
@@ -267,7 +245,6 @@ class TaskTimer {
                         // Проверяем, нет ли уже инициализированного таймера для этой задачи
                         const existingTimer = document.querySelector('.tracker-timer-container');
                         if (existingTimer) {
-                            console.log('TaskTimer: Таймер для задачи уже существует');
                             clearInterval(checkInterval);
                             return;
                         }
@@ -279,7 +256,6 @@ class TaskTimer {
 
                         // Сохраняем заголовок страницы и название задачи с задержкой
                         setTimeout(() => {
-                            console.log('TaskTimer: Сохранение заголовка страницы после смены URL');
                             this.originalTitle = this.getCurrentTaskTitle();
                             // Если таймер активен, обновляем индикатор
                             if (this.isRunning) {
@@ -308,7 +284,6 @@ class TaskTimer {
     removeExistingTimer() {
         const existingTimer = document.querySelector('.tracker-timer-container');
         if (existingTimer) {
-            console.log('TaskTimer: Удаление существующего таймера');
             existingTimer.remove();
         }
     }
@@ -317,12 +292,10 @@ class TaskTimer {
         // Match any uppercase letters followed by a hyphen and numbers
         const match = window.location.pathname.match(/\/([A-Z]+)-(\d+)/);
         const taskId = match ? match[0].substring(1) : null;  // Remove leading slash if found
-        console.log('TaskTimer: Извлечен ID задачи из URL:', taskId, 'Текущий URL:', window.location.pathname);
         return taskId;
     }
 
     initializeUI() {
-        console.log('TaskTimer: Starting UI initialization');
         this.removeExistingTimer();
 
         const timerContainer = document.createElement('div');
@@ -390,18 +363,13 @@ class TaskTimer {
         // Find the action bar
         const actionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
         if (actionBar) {
-            console.log('TaskTimer: Найдена панель действий, добавление таймера');
             actionBar.appendChild(timerListItem);
         } else {
-            console.error('TaskTimer: Не удалось найти панель действий. Повторная попытка через 1 секунду.');
             // Add a retry mechanism since the action bar might load after our initial attempt
             setTimeout(() => {
                 const retryActionBar = document.querySelector('ul.gn-action-bar-group.action-bar__start');
                 if (retryActionBar) {
-                    console.log('TaskTimer: Найдена панель действий при повторной попытке, добавление таймера');
                     retryActionBar.appendChild(timerListItem);
-                } else {
-                    console.error('TaskTimer: Не удалось найти панель действий даже при повторной попытке');
                 }
             }, 1000);
         }
@@ -426,7 +394,6 @@ class TaskTimer {
     async startTimer() {
         // Проверяем наличие taskId
         if (!this.taskId) {
-            console.error('TaskTimer: Попытка запуска таймера без ID задачи');
             return;
         }
 
@@ -495,7 +462,6 @@ class TaskTimer {
     async stopTimer() {
         // Проверяем наличие taskId
         if (!this.taskId) {
-            console.error('TaskTimer: Попытка остановки таймера без ID задачи');
             return;
         }
 
@@ -525,25 +491,20 @@ class TaskTimer {
         
         // Форматируем время
         const formattedTime = this.formatTimeForInput(currentState.elapsedTime);
-        console.log('TaskTimer: Форматированное время:', formattedTime);
         
         // Рассчитываем время начала
         const startTime = new Date(Date.now() - currentState.elapsedTime);
-        console.log('TaskTimer: Время начала (Date):', startTime);
         
         const formattedDate = startTime.toLocaleDateString('ru-RU', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
         });
-        console.log('TaskTimer: Форматированная дата:', formattedDate);
         
         const formattedHours = startTime.getHours().toString().padStart(2, '0');
         const formattedMinutes = startTime.getMinutes().toString().padStart(2, '0');
-        console.log('TaskTimer: Форматированное время (HH:MM):', formattedHours + ':' + formattedMinutes);
         
         const formattedStartTime = `${formattedDate} ${formattedHours}:${formattedMinutes}`;
-        console.log('TaskTimer: Итоговое форматированное время начала:', formattedStartTime);
 
         // Уведомляем background script о завершении задачи
         await chrome.runtime.sendMessage({
@@ -569,38 +530,24 @@ class TaskTimer {
             const dialog = document.querySelector('div.add-worklog-dialog');
             
             if (dialog) {
-                console.log('TaskTimer: Найден диалог учета времени');
                 // Если диалог найден, заполняем поля
                 const durationInput = document.querySelector('.add-worklog-dialog__duration-control input');
                 const dateInput = document.querySelector('.add-worklog-dialog__date-control input');
                 
-                console.log('TaskTimer: Найдены поля ввода:', {
-                    durationInput: !!durationInput,
-                    dateInput: !!dateInput
-                });
-                
                 if (durationInput && dateInput) {
-                    console.log('TaskTimer: Заполняем поле длительности:', formattedTime);
                     durationInput.value = formattedTime;
                     durationInput.dispatchEvent(new Event('input', { bubbles: true }));
                     
                     // Добавляем паузу перед заполнением поля даты/времени
                     setTimeout(() => {
-                        console.log('TaskTimer: Заполняем поле даты/времени:', formattedStartTime);
                         dateInput.value = formattedStartTime;
                         dateInput.dispatchEvent(new Event('input', { bubbles: true }));
                         
                         // Проверяем, что значения были установлены
                         setTimeout(() => {
-                            console.log('TaskTimer: Проверка установленных значений:', {
-                                duration: durationInput.value,
-                                date: dateInput.value
-                            });
                         }, 100);
                     }, 100);
                 }
-            } else {
-                console.log('TaskTimer: Диалог учета времени не найден');
             }
         });
 
@@ -609,12 +556,10 @@ class TaskTimer {
             childList: true,
             subtree: true
         });
-        console.log('TaskTimer: Начато наблюдение за DOM для поиска диалога');
 
         // Устанавливаем таймаут для отключения наблюдателя
         setTimeout(() => {
             observer.disconnect();
-            console.log('TaskTimer: Наблюдение за DOM остановлено по таймауту (5 секунд)');
             this.localFinishInProgress = false;
         }, 5000);
 
@@ -667,7 +612,6 @@ class TaskTimer {
         chrome.storage.sync.get({
             showCloseWarning: true // default value
         }, (items) => {
-            console.log('TaskTimer: Загружены настройки:', items);
             this.showCloseWarning = items.showCloseWarning;
         });
     }
@@ -703,7 +647,6 @@ class TaskTimer {
             chrome.storage.sync.set({
                 showCloseWarning: this.showCloseWarning
             }, () => {
-                console.log('TaskTimer: Настройки сохранены');
             });
         };
         
@@ -746,8 +689,6 @@ class TaskTimer {
             if (changes[stateKey]) {
                 const state = changes[stateKey].newValue;
                 if (state && !this.localFinishInProgress) {
-                    console.log('TaskTimer: Обновление состояния из другой вкладки:', state);
-                    
                     // Обновляем время
                     this.elapsedTime = state.elapsedTime;
                     
@@ -772,7 +713,6 @@ class TaskTimer {
 
                 const finishedTask = changes[this.finishedTaskKey].newValue;
                 if (finishedTask && finishedTask.taskId === this.taskId) {
-                    console.log('TaskTimer: Таймер учтен в другой вкладке');
                     if (this.isRunning) {
                         this.stopTimer();
                     }
@@ -815,7 +755,6 @@ class TaskTimer {
     toggleTimer() {
         // Проверяем наличие taskId
         if (!this.taskId) {
-            console.error('TaskTimer: Попытка переключения таймера без ID задачи');
             return;
         }
 
@@ -846,7 +785,6 @@ class TaskTimer {
             if (key.startsWith('timer_state_')) {
                 // Проверяем наличие taskId в таймере
                 if (!value.taskId) {
-                    console.log('TaskTimer: Удаление некорректного таймера:', key);
                     chrome.storage.local.remove(key);
                 }
             }
@@ -854,10 +792,14 @@ class TaskTimer {
     }
 
     initializeDueDateHighlighting() {
-        console.log('TaskTimer: Начало инициализации подсветки дедлайнов');
+        // Проверяем, не была ли уже инициализирована подсветка
+        if (document.querySelector('style[data-timer-highlighting]')) {
+            return;
+        }
         
         // Обновляем стили для подсветки
         const style = document.createElement('style');
+        style.setAttribute('data-timer-highlighting', 'true');
         style.textContent = `
             /* Стили для таблицы задач */
             .deadline-passed {
@@ -881,32 +823,30 @@ class TaskTimer {
         `;
         document.head.appendChild(style);
 
+        let retryCount = 0;
+        const MAX_RETRIES = 5;
+        const RETRY_DELAY = 2000; // Увеличено до 2 секунд
+
         // Функция для подсветки дедлайнов
         const highlightDueDates = () => {
-            console.log('TaskTimer: Запуск функции подсветки дедлайнов');
-            
             let foundElements = false;
 
             // Находим все ячейки с датами в таблице
             const dueDateCells = document.querySelectorAll('td.gt-table__cell_id_dueDate');
-            console.log('TaskTimer: Найдено ячеек с датами в таблице:', dueDateCells.length);
             
             if (dueDateCells.length > 0) {
                 foundElements = true;
                 dueDateCells.forEach((cell, index) => {
                     const dateSpan = cell.querySelector('span[title]');
                     if (!dateSpan) {
-                        console.log(`TaskTimer: Ячейка ${index + 1} не содержит span с title`);
                         return;
                     }
 
                     // Получаем дату из атрибута title
                     const dateText = dateSpan.getAttribute('title');
-                    console.log(`TaskTimer: Обработка даты для ячейки ${index + 1}:`, dateText);
                     
                     const dueDate = this.parseRussianDate(dateText);
                     if (!dueDate) {
-                        console.log(`TaskTimer: Не удалось распарсить дату для ячейки ${index + 1}`);
                         return;
                     }
 
@@ -922,28 +862,16 @@ class TaskTimer {
                     twoWeeksFromNow.setDate(today.getDate() + 14);
                     twoWeeksFromNow.setHours(23, 59, 59, 999);
 
-                    console.log(`TaskTimer: Сравнение дат для ячейки ${index + 1}:`, {
-                        dateText,
-                        dueDate: dueDate.toISOString(),
-                        dueDateStart: dueDateStart.toISOString(),
-                        today: today.toISOString(),
-                        twoWeeksFromNow: twoWeeksFromNow.toISOString(),
-                        isPassed: dueDateStart < today,
-                        isApproaching: dueDateStart <= twoWeeksFromNow && dueDateStart >= today
-                    });
-
                     // Удаляем предыдущие классы подсветки
                     cell.classList.remove('deadline-passed', 'deadline-approaching');
                     dateSpan.classList.remove('deadline-passed', 'deadline-approaching');
                     
                     // Подсвечиваем просроченные дедлайны (сравниваем начало дня)
                     if (dueDateStart < today) {
-                        console.log(`TaskTimer: Ячейка ${index + 1} - просроченный дедлайн:`, dateText);
                         dateSpan.classList.add('deadline-passed');
                     }
                     // Подсвечиваем приближающиеся дедлайны
                     else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
-                        console.log(`TaskTimer: Ячейка ${index + 1} - приближающийся дедлайн:`, dateText);
                         dateSpan.classList.add('deadline-approaching');
                     }
                 });
@@ -951,17 +879,14 @@ class TaskTimer {
 
             // Добавляем обработку дедлайна на странице задачи
             const dueDateFields = document.querySelectorAll('li[data-id="dueDate"] span.g-button__text > div');
-            console.log('TaskTimer: Найдено полей дедлайна на странице задачи:', dueDateFields.length);
 
             if (dueDateFields.length > 0) {
                 foundElements = true;
                 dueDateFields.forEach((field, index) => {
                     const dateText = field.textContent;
-                    console.log(`TaskTimer: Обработка даты для поля ${index + 1}:`, dateText);
 
                     const dueDate = this.parseRussianDate(dateText);
                     if (!dueDate) {
-                        console.log(`TaskTimer: Не удалось распарсить дату для поля ${index + 1}`);
                         return;
                     }
 
@@ -980,33 +905,36 @@ class TaskTimer {
 
                     // Подсвечиваем просроченные дедлайны
                     if (dueDateStart < today) {
-                        console.log(`TaskTimer: Поле ${index + 1} - просроченный дедлайн:`, dateText);
                         field.classList.add('deadline-passed');
                     }
                     // Подсвечиваем приближающиеся дедлайны
                     else if (dueDateStart <= twoWeeksFromNow && dueDateStart >= today) {
-                        console.log(`TaskTimer: Поле ${index + 1} - приближающийся дедлайн:`, dateText);
                         field.classList.add('deadline-approaching');
                     }
                 });
             }
 
             return foundElements;
-        };
+        }
 
-        // Функция для повторных попыток с таймаутом
+        // Функция для повторных попыток с увеличенным интервалом
         const initializeWithRetry = () => {
-            console.log('TaskTimer: Попытка инициализации подсветки');
-            
             // Пробуем подсветить дедлайны
             if (!highlightDueDates()) {
-                setTimeout(initializeWithRetry, 1000); // Уменьшено до 1 секунды
+                if (retryCount < MAX_RETRIES) {
+                    retryCount++;
+                    setTimeout(initializeWithRetry, RETRY_DELAY);
+                }
                 return;
             }
 
-            // Если всё успешно, устанавливаем наблюдатель
+            // Если всё успешно, устанавливаем наблюдатель с debounce
+            let debounceTimeout;
             const observer = new MutationObserver(() => {
-                highlightDueDates();
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(() => {
+                    highlightDueDates();
+                }, 500); // Добавляем debounce 500ms для обработки множественных изменений
             });
 
             observer.observe(document.body, {
@@ -1015,36 +943,36 @@ class TaskTimer {
             });
         };
 
-        // Запускаем первую попытку через 1 секунду
-        setTimeout(initializeWithRetry, 1000);
+        // Запускаем первую попытку
+        initializeWithRetry();
 
-        // Следим за изменениями URL
-        window.addEventListener('popstate', () => {
-            const newPath = window.location.pathname;
-            if (newPath.includes('/issues') || 
-                newPath.includes('/pages/my') || 
-                newPath.includes('/pages/all') ||
-                newPath === '/') {
-                setTimeout(initializeWithRetry, 1000);
-            }
-        });
+        // Следим за изменениями URL с debounce
+        let urlChangeTimeout;
+        const handleUrlChange = () => {
+            clearTimeout(urlChangeTimeout);
+            urlChangeTimeout = setTimeout(() => {
+                const newPath = window.location.pathname;
+                if (newPath.includes('/issues') || 
+                    newPath.includes('/pages/my') || 
+                    newPath.includes('/pages/all') ||
+                    newPath === '/') {
+                    retryCount = 0; // Сбрасываем счетчик попыток
+                    initializeWithRetry();
+                }
+            }, 500);
+        };
+
+        window.addEventListener('popstate', handleUrlChange);
 
         // Также следим за изменениями через History API
         const originalPushState = history.pushState;
         history.pushState = function() {
             originalPushState.apply(this, arguments);
-            const newPath = window.location.pathname;
-            if (newPath.includes('/issues') || 
-                newPath.includes('/pages/my') || 
-                newPath.includes('/pages/all') ||
-                newPath === '/') {
-                setTimeout(initializeWithRetry, 1000);
-            }
+            handleUrlChange();
         };
     }
 
     parseRussianDate(dateStr) {
-        console.log('TaskTimer: Парсинг даты:', dateStr);
         try {
             // Словарь для преобразования русских названий месяцев
             const monthsRu = {
@@ -1064,34 +992,28 @@ class TaskTimer {
 
             // Разбиваем строку на компоненты
             const parts = dateStr.split(' ');
-            console.log('TaskTimer: Разбор даты:', parts);
             
             let day, month, year;
             
             if (parts.length === 3) {
                 // Формат "24 нояб 2024"
                 [day, month, year] = parts;
-                console.log('TaskTimer: Дата с годом:', { day, month, year });
             } else if (parts.length === 2) {
                 // Формат "24 нояб"
                 [day, month] = parts;
-                console.log('TaskTimer: Дата без года:', { day, month });
             } else {
-                console.log('TaskTimer: Некорректный формат даты - неверное количество частей');
                 return null;
             }
 
             // Проверяем корректность дня
             const parsedDay = parseInt(day, 10);
             if (isNaN(parsedDay) || parsedDay < 1 || parsedDay > 31) {
-                console.log('TaskTimer: Некорректный день:', day);
                 return null;
             }
 
             // Проверяем корректность месяца
             const monthLower = month.toLowerCase();
             if (!monthsRu.hasOwnProperty(monthLower)) {
-                console.log('TaskTimer: Некорректный месяц:', month, 'Доступные месяцы:', Object.keys(monthsRu));
                 return null;
             }
 
@@ -1100,7 +1022,6 @@ class TaskTimer {
             if (year) {
                 parsedYear = parseInt(year, 10);
                 if (isNaN(parsedYear)) {
-                    console.log('TaskTimer: Некорректный год:', year);
                     return null;
                 }
             }
@@ -1130,15 +1051,8 @@ class TaskTimer {
                 }
             }
 
-            console.log('TaskTimer: Успешно создана дата:', {
-                dateStr,
-                parsedDate: date.toISOString(),
-                hasYear: !!parsedYear,
-                isPastDate: date < today
-            });
             return date;
         } catch (e) {
-            console.error('TaskTimer: Ошибка при парсинге даты:', e);
             return null;
         }
     }
@@ -1146,10 +1060,7 @@ class TaskTimer {
 
 // Singleton pattern to prevent multiple timer instances
 if (!window.taskTimerInstance) {
-    console.log('TaskTimer: Создание нового экземпляра');
     window.taskTimerInstance = new TaskTimer();
-} else {
-    console.log('TaskTimer: Экземпляр уже существует');
 }
 
 // Экспортируем класс для возможного использования в других модулях
